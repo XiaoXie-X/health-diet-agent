@@ -42,28 +42,32 @@
         let assistantMessage = ''
         setMessages([...newMessages, { role: 'assistant', content: '' }])
 
+        const handleLine = (line: string) => {
+          if (!line.startsWith('data: ')) return
+          const data = line.slice(6)
+          if (data === '[DONE]') return
+          try {
+            const json = JSON.parse(data)
+            const content = json.choices?.[0]?.delta?.content
+            if (content) {
+              assistantMessage += content
+              setMessages([...newMessages, { role: 'assistant', content: assistantMessage }])
+              scrollToBottom()
+            }
+          } catch (e) {}
+        }
+
         if (reader) {
+          let buffer = ''
           while (true) {
             const { done, value } = await reader.read()
             if (done) break
-            const chunk = decoder.decode(value)
-            const lines = chunk.split('\n')
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6)
-                if (data === '[DONE]') continue
-                try {
-                  const json = JSON.parse(data)
-                  const content = json.choices?.[0]?.delta?.content
-                  if (content) {
-                    assistantMessage += content
-                    setMessages([...newMessages, { role: 'assistant', content: assistantMessage }])
-                    scrollToBottom()
-                  }
-                } catch (e) {}
-              }
-            }
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split('\n')
+            buffer = lines.pop() ?? ''
+            for (const line of lines) handleLine(line)
           }
+          if (buffer) handleLine(buffer)
         }
       } catch (error) {
         console.error('Error:', error)
