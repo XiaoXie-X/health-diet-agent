@@ -5,6 +5,7 @@
     const [messages, setMessages] = useState<{role: string, content: string}[]>([])
     const [input, setInput] = useState('')
     const [loading, setLoading] = useState(false)
+    const [statusText, setStatusText] = useState('')
     const [sessionId, setSessionId] = useState<string>('')
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -25,9 +26,10 @@
       if (!text.trim() || loading) return
       const userMessage = { role: 'user', content: text }
       const newMessages = [...messages, userMessage]
-      setMessages(newMessages)
+      setMessages([...newMessages, { role: 'assistant', content: '' }])
       setInput('')
       setLoading(true)
+      setStatusText('正在思考…')
       setTimeout(scrollToBottom, 50)
 
       try {
@@ -44,7 +46,6 @@
         const reader = res.body?.getReader()
         const decoder = new TextDecoder()
         let assistantMessage = ''
-        setMessages([...newMessages, { role: 'assistant', content: '' }])
 
         const handleLine = (line: string) => {
           if (!line.startsWith('data: ')) return
@@ -52,8 +53,13 @@
           if (data === '[DONE]') return
           try {
             const json = JSON.parse(data)
+            if (json.status) {
+              setStatusText(json.status === 'thinking' ? '正在思考…' : (json.label || '处理中…'))
+              return
+            }
             const content = json.choices?.[0]?.delta?.content
             if (content) {
+              setStatusText('')
               assistantMessage += content
               setMessages([...newMessages, { role: 'assistant', content: assistantMessage }])
               scrollToBottom()
@@ -77,6 +83,7 @@
         console.error('Error:', error)
       }
       setLoading(false)
+      setStatusText('')
     }
 
     return (
@@ -119,7 +126,12 @@
                 <div className="flex w-9 items-center justify-center rounded-full bg-primary/10 text-primary">🦀</div>
               </div>
               <div className="chat-bubble bg-base-200 text-base-content max-w-[90%] whitespace-pre-wrap break-words">
-                {msg.content === '' ? <span className="loading loading-dots loading-md text-primary"></span> : stripMarkdown(msg.content)}
+                {msg.content === '' ? (
+                  <span className="flex items-center gap-2">
+                    <span className="loading loading-dots loading-md text-primary"></span>
+                    {statusText && <span className="text-sm opacity-70">{statusText}</span>}
+                  </span>
+                ) : stripMarkdown(msg.content)}
               </div>
             </div>
           ))}

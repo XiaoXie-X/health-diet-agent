@@ -48,6 +48,9 @@
     const encoder = new TextEncoder()
 const stream = new ReadableStream({
       async start(controller) {
+        // 立即播报思考状态，让用户马上看到反馈
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ status: 'thinking' })}\n\n`))
+
         const reader = response.body?.getReader()
         const decoder = new TextDecoder()
         let assistantMessage = ''
@@ -93,6 +96,14 @@ const stream = new ReadableStream({
             const tc = toolCalls[0]
             let args = {}
             try { args = tc.arguments ? JSON.parse(tc.arguments) : {} } catch (e) { args = {} }
+
+            // 播报工具执行状态，让用户知道进行到哪一步
+            const toolLabels: Record<string, string> = {
+              search_web: `联网搜索：${(args as any).query || ''}`,
+              get_nutrition: `查询营养数据：${(args as any).food || ''}`,
+              calculate_calories: '计算每日热量需求'
+            }
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ status: 'tool', label: toolLabels[tc.name] || '调用工具中…' })}\n\n`))
 
             const result = await executeTool(tc.name, args)
 
