@@ -17,6 +17,10 @@
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
 
+    // 去掉回复中的 Markdown 星号（**加粗**/*斜体*），按纯文本展示
+    const stripMarkdown = (text: string) =>
+      text.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1')
+
     const send = async (text: string) => {
       if (!text.trim() || loading) return
       const userMessage = { role: 'user', content: text }
@@ -115,7 +119,7 @@
                 <div className="flex w-9 items-center justify-center rounded-full bg-primary/10 text-primary">🦀</div>
               </div>
               <div className="chat-bubble bg-base-200 text-base-content max-w-[90%] whitespace-pre-wrap break-words">
-                {msg.content === '' ? <span className="loading loading-dots loading-md text-primary"></span> : msg.content}
+                {msg.content === '' ? <span className="loading loading-dots loading-md text-primary"></span> : stripMarkdown(msg.content)}
               </div>
             </div>
           ))}
