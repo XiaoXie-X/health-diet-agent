@@ -11,8 +11,8 @@
     allergies: string | null
     dislikes: string | null
   }
-  // 数据库文件路径
-  const dbPath = path.join(process.cwd(), 'data', 'app.db')
+  // 数据库文件路径：本地用 data/app.db；Vercel 文件系统只读，改用 /tmp（不持久，冷启动重置）
+  const dbPath = process.env.VERCEL ? '/tmp/app.db' : path.join(process.cwd(), 'data', 'app.db')
 
   // 创建数据库连接
   const db = new Database(dbPath)

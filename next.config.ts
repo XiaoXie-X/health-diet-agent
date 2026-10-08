@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  // better-sqlite3 是原生模块，排除出打包以兼容 Vercel Serverless
+  serverExternalPackages: ['better-sqlite3'],
 };
 
 export default nextConfig;
