@@ -16,6 +16,12 @@
       if (saved) setSessionId(saved)
     }, [])
 
+    // 消息渲染完成后贴底滚动（必须等 DOM 更新完，否则滚到的是旧底部，
+    // 会导致最后一段气泡露在视口外）
+    useEffect(() => {
+      if (stickToBottomRef.current) scrollToBottom()
+    }, [messages])
+
     // 贴底滚动：流式期间用瞬时滚动（smooth 动画会被高频打断导致卡顿）
     const scrollToBottom = (smooth = false) => {
       const el = mainRef.current
@@ -48,7 +54,6 @@
       setLoading(true)
       setStatusText('正在思考…')
       stickToBottomRef.current = true
-      setTimeout(scrollToBottom, 50)
 
       try {
         const res = await fetch('/api/chat', {
@@ -80,7 +85,6 @@
               setStatusText('')
               assistantMessage += content
               setMessages([...newMessages, { role: 'assistant', content: assistantMessage }])
-              if (stickToBottomRef.current) scrollToBottom()
             }
           } catch (e) {}
         }
