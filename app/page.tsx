@@ -7,15 +7,32 @@
     const [loading, setLoading] = useState(false)
     const [statusText, setStatusText] = useState('')
     const [sessionId, setSessionId] = useState<string>('')
-    const messagesEndRef = useRef<HTMLDivElement>(null)
+    const [showScrollBtn, setShowScrollBtn] = useState(false)
+    const mainRef = useRef<HTMLElement>(null)
+    const stickToBottomRef = useRef(true)
 
     useEffect(() => {
       const saved = localStorage.getItem('sessionId')
       if (saved) setSessionId(saved)
     }, [])
 
-    const scrollToBottom = () => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    // 贴底滚动：流式期间用瞬时滚动（smooth 动画会被高频打断导致卡顿）
+    const scrollToBottom = (smooth = false) => {
+      const el = mainRef.current
+      if (!el) return
+      if (smooth) {
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+      } else {
+        el.scrollTop = el.scrollHeight
+      }
+    }
+
+    // 用户主动上翻时停止自动贴底，回到底部附近后恢复
+    const handleScroll = () => {
+      const el = mainRef.current
+      if (!el) return
+      stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 50
+      setShowScrollBtn(!stickToBottomRef.current)
     }
 
     // 去掉回复中的 Markdown 星号（**加粗**/*斜体*），按纯文本展示
@@ -30,6 +47,7 @@
       setInput('')
       setLoading(true)
       setStatusText('正在思考…')
+      stickToBottomRef.current = true
       setTimeout(scrollToBottom, 50)
 
       try {
@@ -62,7 +80,7 @@
               setStatusText('')
               assistantMessage += content
               setMessages([...newMessages, { role: 'assistant', content: assistantMessage }])
-              scrollToBottom()
+              if (stickToBottomRef.current) scrollToBottom()
             }
           } catch (e) {}
         }
@@ -87,7 +105,7 @@
     }
 
     return (
-      <div className="mx-auto flex h-dvh w-full max-w-[480px] flex-col border-x border-base-300 bg-base-100 shadow-sm">
+      <div className="relative mx-auto flex h-dvh w-full max-w-[480px] flex-col border-x border-base-300 bg-base-100 shadow-sm">
         <header className="flex items-center gap-3 border-b border-base-300 px-4 py-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-xl">🦀</div>
           <div>
@@ -98,7 +116,7 @@
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto px-4 py-4">
+        <main ref={mainRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-4">
           {messages.length === 0 && (
             <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
               <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-4xl">🦀</div>
@@ -135,8 +153,21 @@
               </div>
             </div>
           ))}
-          <div ref={messagesEndRef} />
         </main>
+
+        {showScrollBtn && (
+          <button
+            onClick={() => {
+              stickToBottomRef.current = true
+              setShowScrollBtn(false)
+              scrollToBottom(true)
+            }}
+            className="btn btn-circle btn-sm absolute bottom-24 left-1/2 z-10 -translate-x-1/2 border-base-300 bg-base-100 shadow-md"
+            aria-label="回到最新消息"
+          >
+            ↓
+          </button>
+        )}
 
         <footer className="border-t border-base-300 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="flex items-center gap-2">
