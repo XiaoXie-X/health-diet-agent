@@ -104,13 +104,13 @@
             </div>
           )}
           {messages.map((msg, i) => msg.role === 'user' ? (
-            <div key={i} className="chat chat-end">
+            <div key={i} className="chat chat-end animate-fade-up motion-reduce:animate-none">
               <div className="chat-bubble chat-bubble-primary max-w-[90%] whitespace-pre-wrap break-words">
                 {msg.content}
               </div>
             </div>
           ) : (
-            <div key={i} className="chat chat-start">
+            <div key={i} className="chat chat-start animate-fade-up motion-reduce:animate-none">
               <div className="chat-image avatar">
                 <div className="flex w-9 items-center justify-center rounded-full bg-primary/10 text-primary">🦀</div>
               </div>
@@ -122,10 +122,10 @@
           <div ref={messagesEndRef} />
         </main>
 
-        <footer className="border-t border-base-300 p-3">
+        <footer className="border-t border-base-300 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="flex items-center gap-2">
             <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && send(input)}
-              className="input flex-1 bg-base-200" placeholder="问问小蟹营养问题..." />
+              className="input flex-1 rounded-full border-none bg-base-200 focus:outline-none focus:ring-2 focus:ring-primary/40" placeholder="问问小蟹营养问题..." />
             <button onClick={() => send(input)} disabled={loading || !input.trim()}
               className="btn btn-primary btn-circle" aria-label="发送">➤</button>
           </div>
