@@ -7,18 +7,29 @@
     const user = userDb.getOrCreate(sessionId)
     const historyMessages = messageDb.getHistory(sessionId, 20)
 
-    const systemPrompt = `你是营养师小蟹，说话像朋友一样自然。回答简短，推荐食物时简单说说理由。
+    const systemPrompt = `你是营养师小蟹，说话像朋友一样自然随和。回答简短实用，推荐食物时简单说说理由。
 
-  用户信息：
-  - 年龄：${user.age || '未知'}
-  - 性别：${user.gender || '未知'}
-  - 身高：${user.height ? user.height + 'cm' : '未知'}
-  - 体重：${user.weight ? user.weight + 'kg' : '未知'}
-  - 目标：${user.goal || '一般健康'}
-  - 过敏：${user.allergies || '无'}
-  - 忌口：${user.dislikes || '无'}
+【输出格式】
+- 用纯文本回复，禁止使用 Markdown 语法（如 **加粗**、# 标题、* 星号列表）
+- 需要列举时用「1. 2. 3.」编号或顿号分隔，一项一行
+- 先给结论，再说理由，控制在 200 字以内
 
-  如果聊天中用户提到了以上信息，记得主动确认并更新。`
+【工具使用】
+- 用户询问具体食物的营养成分（热量/蛋白质等）→ 调用 get_nutrition
+- 用户想算每日热量需求、减脂增肌摄入量 → 调用 calculate_calories
+- 涉及时令食物、最新资讯、需要联网核实的内容 → 调用 search_web
+- 日常闲聊和一般饮食建议不需要工具，直接回答
+
+用户信息：
+- 年龄：${user.age || '未知'}
+- 性别：${user.gender || '未知'}
+- 身高：${user.height ? user.height + 'cm' : '未知'}
+- 体重：${user.weight ? user.weight + 'kg' : '未知'}
+- 目标：${user.goal || '一般健康'}
+- 过敏：${user.allergies || '无'}
+- 忌口：${user.dislikes || '无'}
+
+如果聊天中用户提到了以上信息，记得主动确认并更新。`
 
     const allMessages = [
       { role: 'system', content: systemPrompt },
@@ -48,17 +59,22 @@
     const encoder = new TextEncoder()
 const stream = new ReadableStream({
       async start(controller) {
+        // 立即播报思考状态，让用户马上看到反馈
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ status: 'thinking' })}\n\n`))
+
         const reader = response.body?.getReader()
         const decoder = new TextDecoder()
         let assistantMessage = ''
         let toolCalls: any[] = []
 
         if (reader) {
+          let buffer = ''
           while (true) {
             const { done, value } = await reader.read()
             if (done) break
-            const chunk = decoder.decode(value)
-            const lines = chunk.split('\n')
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split('\n')
+            buffer = lines.pop() ?? ''
             for (const line of lines) {
               if (line.startsWith('data: ')) {
                 const data = line.slice(6)
@@ -92,6 +108,14 @@ const stream = new ReadableStream({
             let args = {}
             try { args = tc.arguments ? JSON.parse(tc.arguments) : {} } catch (e) { args = {} }
 
+            // 播报工具执行状态，让用户知道进行到哪一步
+            const toolLabels: Record<string, string> = {
+              search_web: `联网搜索：${(args as any).query || ''}`,
+              get_nutrition: `查询营养数据：${(args as any).food || ''}`,
+              calculate_calories: '计算每日热量需求'
+            }
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ status: 'tool', label: toolLabels[tc.name] || '调用工具中…' })}\n\n`))
+
             const result = await executeTool(tc.name, args)
 
             if (tc.name === 'search_web') {
@@ -104,10 +128,10 @@ const stream = new ReadableStream({
             } else if (tc.name === 'get_nutrition') {
               const data = result as any
               if (data.calories !== undefined) {
-                assistantMessage = `${data.food}的营养成分（每100g）：\n- 热量：${data.calories}kcal\n- 蛋白质：${data.protein}g\n- 碳水：${data.carbs}g\n-
-        脂肪：${data.fat}g`
+                assistantMessage = `${data.food}的营养成分（每100g）：\n- 热量：${data.calories}kcal\n- 蛋白质：${data.protein}g\n- 碳水：${data.carbs}g\n- 脂肪：${data.fat}g`
               } else {
-                assistantMessage = data.message || '查询失败'
+                // 数据库未收录，让模型基于营养知识给出估算
+                assistantMessage = await estimateNutrition((args as any).food)
               }
             } else if (tc.name === 'calculate_calories') {
               const data = result as any
@@ -144,4 +168,29 @@ const stream = new ReadableStream({
     return new Response(stream, {
       headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'x-session-id': sessionId }
     })
+  }
+
+  // 数据库未收录的食物：调用模型基于营养知识估算
+  async function estimateNutrition(food: string): Promise<string> {
+    try {
+      const res = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          stream: false,
+          messages: [
+            { role: 'system', content: '你是营养数据库。根据营养学知识估算食物每100g的营养成分，用纯文本回复（禁止Markdown符号），格式：\nXX的营养成分（每100g，估算值）：\n- 热量：XXkcal\n- 蛋白质：XXg\n- 碳水：XXg\n- 脂肪：XXg\n最后单独一行注明「以上为估算值，仅供参考」。' },
+            { role: 'user', content: `食物：${food}` }
+          ]
+        })
+      })
+      const data = await res.json()
+      return data.choices?.[0]?.message?.content || `抱歉，暂时查不到「${food}」的营养数据`
+    } catch (e) {
+      return `抱歉，暂时查不到「${food}」的营养数据`
+    }
   }
