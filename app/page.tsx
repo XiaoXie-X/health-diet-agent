@@ -1,5 +1,6 @@
 'use client'
   import { useState, useRef, useEffect } from 'react'
+  import XiaoxieIcon from './XiaoxieIcon'
 
   export default function Home() {
     const [messages, setMessages] = useState<{role: string, content: string}[]>([])
@@ -111,7 +112,7 @@
     return (
       <div className="relative mx-auto flex h-dvh w-full max-w-[480px] flex-col border-x border-base-300 bg-base-100 shadow-sm">
         <header className="flex items-center gap-3 border-b border-base-300 px-4 py-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-xl">🦀</div>
+          <XiaoxieIcon className="h-10 w-10 shrink-0" />
           <div>
             <h1 className="text-base font-semibold leading-tight">小蟹 · AI 营养师</h1>
             <p className="flex items-center gap-1.5 text-xs text-base-content/60">
@@ -123,7 +124,7 @@
         <main ref={mainRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-4">
           {messages.length === 0 && (
             <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
-              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-4xl">🦀</div>
+              <XiaoxieIcon className="h-20 w-20" />
               <div>
                 <h2 className="text-lg font-semibold">你好，我是小蟹</h2>
                 <p className="mt-1 text-sm text-base-content/60">你的 AI 营养师，随时帮你分析饮食、推荐健康搭配</p>
@@ -145,7 +146,7 @@
           ) : (
             <div key={i} className="chat chat-start animate-fade-up motion-reduce:animate-none">
               <div className="chat-image avatar">
-                <div className="flex w-9 items-center justify-center rounded-full bg-primary/10 text-primary">🦀</div>
+                <XiaoxieIcon className="w-9 shrink-0" />
               </div>
               <div className="chat-bubble bg-base-200 text-base-content max-w-[90%] whitespace-pre-wrap break-words">
                 {msg.content === '' ? (
