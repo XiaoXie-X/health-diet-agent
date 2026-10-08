@@ -128,10 +128,10 @@ const stream = new ReadableStream({
             } else if (tc.name === 'get_nutrition') {
               const data = result as any
               if (data.calories !== undefined) {
-                assistantMessage = `${data.food}的营养成分（每100g）：\n- 热量：${data.calories}kcal\n- 蛋白质：${data.protein}g\n- 碳水：${data.carbs}g\n-
-        脂肪：${data.fat}g`
+                assistantMessage = `${data.food}的营养成分（每100g）：\n- 热量：${data.calories}kcal\n- 蛋白质：${data.protein}g\n- 碳水：${data.carbs}g\n- 脂肪：${data.fat}g`
               } else {
-                assistantMessage = data.message || '查询失败'
+                // 数据库未收录，让模型基于营养知识给出估算
+                assistantMessage = await estimateNutrition((args as any).food)
               }
             } else if (tc.name === 'calculate_calories') {
               const data = result as any
@@ -168,4 +168,29 @@ const stream = new ReadableStream({
     return new Response(stream, {
       headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'x-session-id': sessionId }
     })
+  }
+
+  // 数据库未收录的食物：调用模型基于营养知识估算
+  async function estimateNutrition(food: string): Promise<string> {
+    try {
+      const res = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          stream: false,
+          messages: [
+            { role: 'system', content: '你是营养数据库。根据营养学知识估算食物每100g的营养成分，用纯文本回复（禁止Markdown符号），格式：\nXX的营养成分（每100g，估算值）：\n- 热量：XXkcal\n- 蛋白质：XXg\n- 碳水：XXg\n- 脂肪：XXg\n最后单独一行注明「以上为估算值，仅供参考」。' },
+            { role: 'user', content: `食物：${food}` }
+          ]
+        })
+      })
+      const data = await res.json()
+      return data.choices?.[0]?.message?.content || `抱歉，暂时查不到「${food}」的营养数据`
+    } catch (e) {
+      return `抱歉，暂时查不到「${food}」的营养数据`
+    }
   }
