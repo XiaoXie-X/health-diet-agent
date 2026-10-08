@@ -76,10 +76,19 @@
     }
 
     return (
-      <div className="max-w-2xl mx-auto p-4">
-        <h1 className="text-2xl font-bold mb-4">健康饮食助手</h1>
-        <div className="border rounded-lg p-4 h-96 overflow-y-auto mb-4">
-          {messages.length === 0 && <div className="text-gray-400 text-center">问我任何营养问题...</div>}
+      <div className="mx-auto flex h-dvh w-full max-w-[480px] flex-col border-x border-base-300 bg-base-100 shadow-sm">
+        <header className="flex items-center gap-3 border-b border-base-300 px-4 py-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-xl">🦀</div>
+          <div>
+            <h1 className="text-base font-semibold leading-tight">小蟹 · AI 营养师</h1>
+            <p className="flex items-center gap-1.5 text-xs text-base-content/60">
+              <span className="h-1.5 w-1.5 rounded-full bg-secondary" />在线
+            </p>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto px-4 py-4">
+          {messages.length === 0 && <div className="text-base-content/50 text-center">问我任何营养问题...</div>}
           {messages.map((msg, i) => (
             <div key={i} className={`mb-2 ${msg.role === 'user' ? 'text-right' : ''}`}>
               <span className={`inline-block p-2 rounded max-w-[85%] sm:max-w-[75%] whitespace-pre-wrap break-words ${msg.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}>
@@ -87,14 +96,18 @@
               </span>
             </div>
           ))}
-          {loading && <div className="text-gray-500">思考中...</div>}
+          {loading && <div className="text-base-content/60">思考中...</div>}
           <div ref={messagesEndRef} />
-        </div>
-        <div className="flex gap-2">
-          <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMessage()}
-            className="flex-1 border rounded px-3 py-2" placeholder="输入消息..." />
-          <button onClick={sendMessage} className="bg-blue-500 text-white px-4 py-2 rounded">发送</button>
-        </div>
+        </main>
+
+        <footer className="border-t border-base-300 p-3">
+          <div className="flex items-center gap-2">
+            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMessage()}
+              className="input flex-1 bg-base-200" placeholder="问问小蟹营养问题..." />
+            <button onClick={sendMessage} disabled={loading || !input.trim()}
+              className="btn btn-primary btn-circle" aria-label="发送">➤</button>
+          </div>
+        </footer>
       </div>
     )
   }
