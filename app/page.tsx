@@ -82,7 +82,7 @@
           {messages.length === 0 && <div className="text-gray-400 text-center">问我任何营养问题...</div>}
           {messages.map((msg, i) => (
             <div key={i} className={`mb-2 ${msg.role === 'user' ? 'text-right' : ''}`}>
-              <span className={`inline-block p-2 rounded max-w-xs ${msg.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}>
+              <span className={`inline-block p-2 rounded max-w-[85%] sm:max-w-[75%] whitespace-pre-wrap break-words ${msg.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}>
                 {msg.content}
               </span>
             </div>
