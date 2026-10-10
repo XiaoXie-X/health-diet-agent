@@ -132,20 +132,26 @@ export const tools = [
         })
       })
 
-      const data = await response.json()
+      const data = await response.json().catch(() => null)
+
+      // 区分「服务调用失败」和「确实没有结果」，让模型能据此选择兜底策略
+      if (!response.ok || !data) {
+        return { query, message: `搜索服务调用失败（HTTP ${response.status}）。请改用你已有的知识回答，并注明可能不是最新信息` }
+      }
 
       if (data.results && data.results.length > 0) {
         return {
           query,
           results: data.results.map((r: any) => ({
             title: r.title,
-            content: r.content,
+            // 截断正文，避免模型把网页原文整段粘贴给用户
+            content: (r.content || '').slice(0, 600),
             url: r.url
           }))
         }
       }
-      return { query, message: '未找到相关信息' }
+      return { query, message: '未找到相关信息。请改用你已有的知识回答，并注明可能不是最新信息' }
     } catch (error) {
-      return { query, message: '搜索失败，请稍后重试' }
+      return { query, message: '搜索服务暂时不可用。请改用你已有的知识回答，并注明可能不是最新信息' }
     }
   }

@@ -28,8 +28,10 @@
 - 用户询问具体食物的营养成分（热量/蛋白质等）→ 调用 get_nutrition
 - 用户想算每日热量需求、减脂增肌摄入量 → 调用 calculate_calories
 - 涉及时令食物、最新资讯、需要联网核实的内容 → 调用 search_web
+- 构造搜索词时用「主题 + 关键属性」的关键词组合（如"中国居民膳食指南 2022 核心推荐"），不要照搬用户原话，也不要只用一两个宽泛词
 - 日常闲聊和一般饮食建议不需要工具，直接回答
 - 搜索没有返回结果时，绝不能只说"没有找到相关信息"——改用你已有的知识回答，并注明"以上基于我的既有知识，可能不是最新版本，建议查阅官方最新发布"
+- 搜索返回资料后，必须用自己的话提炼成简明的要点（一般不超过6条），禁止把网页原文、导航菜单、地址电话等无关内容直接粘贴给用户；结尾附上1-2个来源链接即可
 
 【对话引导】
 - 回答完合适的问题后，可顺势追问一个相关小问题（如口味偏好、忌口），推进对话
@@ -116,7 +118,8 @@ const stream = new ReadableStream({
           }
         }
 
-        // 处理工具调用
+        // 处理工具调用：执行工具后把结果交回模型，由模型生成最终回答（而不是代码直接拼接工具输出）
+        let streamedToClient = false
         if (toolCalls.length > 0 && toolCalls[0].name) {
           try {
             const tc = toolCalls[0]
@@ -133,47 +136,95 @@ const stream = new ReadableStream({
 
             const result = await executeTool(tc.name, args)
 
+            // 把工具结果整理成给模型看的素材（而非直接面向用户的最终回复）
+            let toolResultContent: string
             if (tc.name === 'search_web') {
               const data = result as any
-              if (data.results && data.results.length > 0) {
-                assistantMessage = `搜索结果：\n\n${data.results.map((r: any) => `📌 ${r.title}\n${r.content}\n🔗 ${r.url}`).join('\n\n')}`
-              } else {
-                assistantMessage = '没有找到相关信息'
-              }
+              toolResultContent = data.results && data.results.length > 0
+                ? data.results.map((r: any) => `标题：${r.title}\n内容：${r.content}\n链接：${r.url}`).join('\n\n')
+                : (data.message || '未找到相关信息')
             } else if (tc.name === 'get_nutrition') {
               const data = result as any
-              if (data.calories !== undefined) {
-                assistantMessage = `${data.food}的营养成分（每100g）：\n- 热量：${data.calories}kcal\n- 蛋白质：${data.protein}g\n- 碳水：${data.carbs}g\n- 脂肪：${data.fat}g`
-              } else {
-                // 数据库未收录，让模型基于营养知识给出估算
-                assistantMessage = await estimateNutrition((args as any).food)
-              }
+              toolResultContent = data.calories !== undefined
+                ? `${data.food}的营养成分（每100g）：热量${data.calories}kcal、蛋白质${data.protein}g、碳水${data.carbs}g、脂肪${data.fat}g`
+                : await estimateNutrition((args as any).food)
             } else if (tc.name === 'calculate_calories') {
               const data = result as any
-              assistantMessage = `计算结果：\n- 基础代谢率(BMR)：${data.bmr}kcal\n-
-        每日消耗(TDEE)：${data.tdee}kcal\n\n减脂建议：${data.recommendation.减脂}kcal/天\n增肌建议：${data.recommendation.增肌}kcal/天`
+              toolResultContent = `计算结果：基础代谢率(BMR)${data.bmr}kcal，每日消耗(TDEE)${data.tdee}kcal，减脂建议${data.recommendation.减脂}kcal/天，增肌建议${data.recommendation.增肌}kcal/天`
             } else {
-              assistantMessage = JSON.stringify(result, null, 2)
+              toolResultContent = JSON.stringify(result)
             }
+
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ status: 'tool', label: '正在整理回答…' })}\n\n`))
+
+            // 第二轮调用：模型基于工具结果、以小蟹的口吻生成最终回答，真实流式转发给前端
+            const toolCallId = tc.id || `call_${Date.now()}`
+            const secondResponse = await fetch('https://api.deepseek.com/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`
+              },
+              body: JSON.stringify({
+                messages: [
+                  ...allMessages,
+                  { role: 'assistant', content: null, tool_calls: [{ id: toolCallId, type: 'function', function: { name: tc.name, arguments: tc.arguments || '{}' } }] },
+                  { role: 'tool', tool_call_id: toolCallId, content: toolResultContent }
+                ],
+                model: 'deepseek-chat',
+                stream: true
+              })
+            })
+
+            assistantMessage = ''
+            const reader2 = secondResponse.body?.getReader()
+            const decoder2 = new TextDecoder()
+            if (reader2) {
+              let buffer2 = ''
+              while (true) {
+                const { done, value } = await reader2.read()
+                if (done) break
+                buffer2 += decoder2.decode(value, { stream: true })
+                const lines2 = buffer2.split('\n')
+                buffer2 = lines2.pop() ?? ''
+                for (const line2 of lines2) {
+                  if (line2.startsWith('data: ')) {
+                    const data2 = line2.slice(6)
+                    if (data2 === '[DONE]') continue
+                    try {
+                      const json2 = JSON.parse(data2)
+                      const content2 = json2.choices?.[0]?.delta?.content
+                      if (content2) {
+                        assistantMessage += content2
+                        streamedToClient = true
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: content2 } }] })}\n\n`))
+                      }
+                    } catch (e) {}
+                  }
+                }
+              }
+            }
+            // 模型异常没生成内容时，退回展示工具原始结果
+            if (!assistantMessage) assistantMessage = toolResultContent
           } catch (e) {
             assistantMessage = '工具调用出错了'
           }
         }
 
-        // 发送回复
+        // 发送回复（工具路径已真实流式转发，这里只兜底未流式的路径）
         if (!assistantMessage) {
-    assistantMessage = '抱歉，我没听懂，能再说一遍吗？'
-  }
+          assistantMessage = '抱歉，我没听懂，能再说一遍吗？'
+        }
 
-  if (assistantMessage) {
+        if (assistantMessage && !streamedToClient) {
           // 分段发送，模拟流式效果
           const chunkSize = 10
           for (let i = 0; i < assistantMessage.length; i += chunkSize) {
             const chunk = assistantMessage.slice(i, i + chunkSize)
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: chunk } }] })}\n\n`))
           }
-          messageDb.save(sessionId, 'assistant', assistantMessage)
         }
+        messageDb.save(sessionId, 'assistant', assistantMessage)
 
         controller.enqueue(encoder.encode('data: [DONE]\n\n'))
         controller.close()
