@@ -6,8 +6,7 @@
 
 ![技术栈](https://img.shields.io/badge/Next.js-16-black) ![模型](https://img.shields.io/badge/DeepSeek-Function%20Calling-blue) ![UI](https://img.shields.io/badge/daisyUI-5-brightgreen) ![部署](https://img.shields.io/badge/Vercel-已上线-success)
 
-<!-- 截图位置：放一张界面截图到 docs/screenshot.png 后取消下行注释 -->
-<!-- ![产品截图](docs/screenshot.png) -->
+![产品截图](docs/screenshot.png)
 
 ---
 
