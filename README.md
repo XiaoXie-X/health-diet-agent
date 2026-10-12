@@ -2,7 +2,7 @@
 
 > 会记事的贴心营养师 —— 基于大模型的个性化健康饮食助手
 
-**在线体验**：[health-diet-agent-xie-2b9b.vercel.app](https://health-diet-agent-xie-2b9b.vercel.app)
+**在线体验**：[health-diet-agent.vercel.app](https://health-diet-agent.vercel.app)
 
 ![技术栈](https://img.shields.io/badge/Next.js-16-black) ![模型](https://img.shields.io/badge/DeepSeek-Function%20Calling-blue) ![UI](https://img.shields.io/badge/daisyUI-5-brightgreen) ![部署](https://img.shields.io/badge/Vercel-已上线-success)
 
