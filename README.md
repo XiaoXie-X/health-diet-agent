@@ -2,7 +2,7 @@
 
 > 会记事的贴心营养师 —— 基于大模型的个性化健康饮食助手
 
-**在线体验**：[health-diet-agent-xie-2b9b.vercel.app](https://health-diet-agent-5arbojzc2-xie-2b9b.vercel.app)
+**在线体验**：[health-diet-agent-xie-2b9b.vercel.app](https://health-diet-agent-xie-2b9b.vercel.app)
 
 ![技术栈](https://img.shields.io/badge/Next.js-16-black) ![模型](https://img.shields.io/badge/DeepSeek-Function%20Calling-blue) ![UI](https://img.shields.io/badge/daisyUI-5-brightgreen) ![部署](https://img.shields.io/badge/Vercel-已上线-success)
 
@@ -81,9 +81,9 @@
 | 估算份量错位 | 问"螺蛳粉"只给每 100g 数据，用户预期是"一碗" | 估算兜底只输出单位营养，无份量换算 | 估算输出追加常见份量换算（一碗/一份约多少热量） |
 | 简单问题偏长 | "鸡蛋热量"回复完整营养列表 | 弹性长度指令对纯查询类不够具体 | 增加"纯查询一行答完"规则 |
 
-修复后本地复测：膳食指南类问题在「搜索正常」与「搜索服务不可用」两种场景下均能输出结构化、带来源/时效声明的回答。
+修复后复测通过（本地双场景 + 线上验证）：搜索正常时输出结构化回答并附来源链接；搜索服务异常时自动降级为既有知识作答并注明时效性。
 
-**工程历程**：18+ 个语义化提交，从 MVP 到上线全程可回溯（`git log` 可查）。
+**工程历程**：25 个语义化提交，从 MVP 到上线全程可回溯（`git log` 可查）。
 
 ## 🚀 本地运行
 
